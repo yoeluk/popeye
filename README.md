@@ -1,6 +1,6 @@
 ### Popeye for PDFBox 
 Popeye is a queue job manager (in package extra.queuemanager) with Akka.
-It offers the implementer an abtract class of [T] that takes a function of type 
+It offers the implementer an abstract class (Manager) of [T] that takes a function of type 
 `HashMap[T, Work[T]] => Boolean`. Where Work is 
 
 ```scala
