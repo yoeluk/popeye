@@ -100,10 +100,10 @@ class Parser extends Actor with ActorLogging {
 
   implicit object implicitStripper extends Strippable[PDFTextStripper] {
     def goStripper(p: Int): ParVector[PDFTextStripper] =
-      (p to 0).foldLeft(ParVector.empty[PDFTextStripper])((ac, i) => {
+      (0 to p-1).reverse.foldLeft(ParVector.empty[PDFTextStripper])((ac, i) => {
         val str = new PDFTextStripper
-        str.setStartPage(p)
-        str.setEndPage(p)
+        str.setStartPage(i)
+        str.setEndPage(i)
         str +: ac
       })
   }
