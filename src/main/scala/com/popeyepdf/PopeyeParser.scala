@@ -149,9 +149,11 @@ class Parser extends Actor with ActorLogging {
 }
 
 //object Stripper {
-//  trait Strippable[Repr[T], A] {
-//    def goStripper(p: Int)(implicit cbf: CanBuildFrom[Repr[A], A, Repr[A]]): Repr[A]
+//  trait PairT {type Repr[T] <: GenSeqLike[T, Repr[T]]; type A}
+//  trait TypeClass[A <: PairT]
+//  trait Strippable[AB <: PairT] {
+//    def goStripper(p: Int): AB#A
 //  }
-//  def apply[A, B, Repr[T] <: GenSeqLike[T, Repr[T]]: Strippable](init: Repr[A])(p: Int)(implicit r: Strippable[Repr[B], A])
-//   = implicitly[Strippable[Repr[B], A]].goStripper(p)
+//  def apply[AB <: PairT: TypeClass](init: AB#Repr[AB#A])(p: Int)(implicit cbf: CanBuildFrom[AB#Repr[AB#A], AB#A, AB#Repr[AB#A]])
+//   = implicitly[Strippable[AB]].goStripper(p)
 //}
