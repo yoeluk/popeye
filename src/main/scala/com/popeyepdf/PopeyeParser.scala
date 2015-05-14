@@ -126,7 +126,7 @@ class Parser extends Actor with ActorLogging {
        * this is probably more efficient as well as more concise
        */
 
-      val parStripper = Stripper(pages) //Stripper(ParVector.empty[PDFTextStripper])(pages)
+      val parStripper: ParVector[PDFTextStripper] = Stripper(pages) //goStripper(ParVector.empty[PDFTextStripper])(pages)
       val extrText = parStripper.map(_.getText(doc)).toList
 
       sender() ! JobDone(doc, Result(result = extrText.toJson, id = info.getCustomMetadataValue("fileName")))
@@ -138,14 +138,14 @@ class Parser extends Actor with ActorLogging {
       self ! PoisonPill
   }
 
-  def goStripper[A, Repr[T] <: GenSeqLike[T, Repr[T]]](ac: Repr[A])(p: Int)
-                (implicit cbf: CanBuildFrom[Repr[A], A, Repr[A]]): Repr[A]  = {
-    val str = new PDFTextStripper
-    str.setStartPage(p)
-    str.setEndPage(p)
-    if (p > 0) goStripper(str.asInstanceOf[A] +: ac)(p-1)
-    else str.asInstanceOf[A] +: ac
-  }
+  def goStripper[Repr[T] <: GenSeqLike[T, Repr[T]]](init: Repr[PDFTextStripper])(p: Int)
+                (implicit cbf: CanBuildFrom[Repr[PDFTextStripper], PDFTextStripper, Repr[PDFTextStripper]]): Repr[PDFTextStripper]  =
+    (0 to p-1).reverse.foldLeft(init)((ac, i) => {
+      val str = new PDFTextStripper
+      str.setStartPage(i)
+      str.setEndPage(i)
+      str +: ac
+    })
 }
 
 object Stripper {
