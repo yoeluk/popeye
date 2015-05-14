@@ -5,6 +5,7 @@ import spray.json._
 import PopeyeJsonProtocol._
 import scala.annotation.tailrec
 import scala.collection.generic.CanBuildFrom
+import scala.collection.parallel.immutable.ParVector
 import scala.concurrent.duration._
 import scala.collection.{GenSeq, GenSeqLike, immutable}
 import akka.util.Timeout
@@ -31,7 +32,7 @@ class PopeyeParser extends Actor with ActorLogging {
   import ManagerInitializer._
   implicit val timeout = Timeout(60 seconds)
 
-  val workManager = context.actorOf(Props(new ManagerActor), name = "manager")
+  val workManager = context.actorOf(Props[ManagerActor], name = "manager")
 
   def receive = {
     case request: ParseRequest =>
@@ -46,10 +47,10 @@ class PopeyeParser extends Actor with ActorLogging {
   }
 
   def createDispatcher = {
-    context.actorOf(Props(new JobDispatcher))
+    context.actorOf(Props[JobDispatcher])
   }
   def createParser = {
-    context.actorOf(Props(new Parser))
+    context.actorOf(Props[Parser])
   }
 }
 
@@ -69,7 +70,7 @@ object ManagerInitializer {
     })
 }
 
-class JobDispatcher extends Actor with ActorLogging {
+class JobDispatcher extends Actor {
 
   implicit val timeout = Timeout(60 seconds)
 
@@ -94,9 +95,18 @@ class JobDispatcher extends Actor with ActorLogging {
   }
 }
 
-class Parser extends Actor with ActorLogging  {
+class Parser extends Actor with ActorLogging {
+  import Stripper._
 
-  import scala.collection.parallel.immutable.ParVector
+  implicit object implicitStripper extends Strippable[PDFTextStripper] {
+    def goStripper(ac: ParVector[PDFTextStripper])(p: Int): ParVector[PDFTextStripper] = {
+      val str = new PDFTextStripper
+      str.setStartPage(p)
+      str.setEndPage(p)
+      if (p > 1) goStripper(str +: ac)(p-1)
+      else str +: ac
+    }
+  }
 
   def receive = {
     case doc: PDDocument =>
@@ -116,7 +126,7 @@ class Parser extends Actor with ActorLogging  {
        * this is probably more efficient as well as more concise
        */
 
-      val parStripper = goStripper(ParVector.empty[PDFTextStripper])(pages)
+      val parStripper = Stripper(ParVector.empty[PDFTextStripper])(pages)
       val extrText = parStripper.map(_.getText(doc)).toList
 
       sender() ! JobDone(doc, Result(result = extrText.toJson, id = info.getCustomMetadataValue("fileName")))
@@ -128,22 +138,19 @@ class Parser extends Actor with ActorLogging  {
       self ! PoisonPill
   }
 
-  /**
-   * Builds an sequence of PDFTextStripper containing a PDFTextStripper per page of the pdf file
-   * @param ac an accumulator
-   * @param p a page to parse
-   * @param cbf implicit CanBuildFrom param
-   * @tparam Repr the collection representation
-   * @return
-   */
+//  def goStripper[A, Repr <: GenSeqLike[A, Repr]](ac: Repr)(p: Int)
+//                (implicit cbf: CanBuildFrom[Repr, A, Repr]): Repr = {
+//    val str = new PDFTextStripper
+//    str.setStartPage(p)
+//    str.setEndPage(p)
+//    if (p > 1) goStripper(str +: ac)(p-1)
+//    else str +: ac
+//  }
+}
 
-  @tailrec
-  private def goStripper[A <: PDFStreamEngine, Repr <: GenSeqLike[A, Repr]]
-  (ac: Repr)(p: Int)(implicit cbf: CanBuildFrom[Repr, A, Repr]): Repr = {
-    val str = new PDFTextStripper
-    str.setStartPage(p)
-    str.setEndPage(p)
-    if (p > 1) goStripper(str +: ac)(p-1)
-    else str +: ac
+object Stripper {
+  trait Strippable[A] {
+    def goStripper(ac: ParVector[A])(p: Int): ParVector[A]
   }
+  def apply[A: Strippable](a: ParVector[A])(p: Int) = implicitly[Strippable[A]].goStripper(a)(p)
 }
