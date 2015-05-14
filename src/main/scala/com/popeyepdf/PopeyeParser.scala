@@ -99,13 +99,13 @@ class Parser extends Actor with ActorLogging {
   import Stripper._
 
   implicit object implicitStripper extends Strippable[PDFTextStripper] {
-    def goStripper(ac: ParVector[PDFTextStripper])(p: Int): ParVector[PDFTextStripper] = {
-      val str = new PDFTextStripper
-      str.setStartPage(p)
-      str.setEndPage(p)
-      if (p > 1) goStripper(str +: ac)(p-1)
-      else str +: ac
-    }
+    def goStripper(p: Int): ParVector[PDFTextStripper] =
+      (p to 0).foldLeft(ParVector.empty[PDFTextStripper])((ac, i) => {
+        val str = new PDFTextStripper
+        str.setStartPage(p)
+        str.setEndPage(p)
+        str +: ac
+      })
   }
 
   def receive = {
@@ -126,7 +126,7 @@ class Parser extends Actor with ActorLogging {
        * this is probably more efficient as well as more concise
        */
 
-      val parStripper = Stripper(ParVector.empty[PDFTextStripper])(pages)
+      val parStripper: ParVector[PDFTextStripper] = Stripper(pages)
       val extrText = parStripper.map(_.getText(doc)).toList
 
       sender() ! JobDone(doc, Result(result = extrText.toJson, id = info.getCustomMetadataValue("fileName")))
@@ -139,18 +139,12 @@ class Parser extends Actor with ActorLogging {
   }
 
 //  def goStripper[A, Repr <: GenSeqLike[A, Repr]](ac: Repr)(p: Int)
-//                (implicit cbf: CanBuildFrom[Repr, A, Repr]): Repr = {
-//    val str = new PDFTextStripper
-//    str.setStartPage(p)
-//    str.setEndPage(p)
-//    if (p > 1) goStripper(str +: ac)(p-1)
-//    else str +: ac
-//  }
+//                (implicit cbf: CanBuildFrom[Repr, A, Repr]): Repr
 }
 
 object Stripper {
   trait Strippable[A] {
-    def goStripper(ac: ParVector[A])(p: Int): ParVector[A]
+    def goStripper(p: Int): ParVector[A]
   }
-  def apply[A: Strippable](a: ParVector[A])(p: Int) = implicitly[Strippable[A]].goStripper(a)(p)
+  def apply[A: Strippable](p: Int) = implicitly[Strippable[A]].goStripper(p)
 }
